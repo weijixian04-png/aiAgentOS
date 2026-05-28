@@ -1,3 +1,6 @@
 tornado==6.5.1
 openai
 requests
+apscheduler
+croniter
+beautifulsoup4

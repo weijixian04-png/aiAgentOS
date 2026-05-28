@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手势配置管理 - cnAgentOS</title>
+    
+    <link rel="stylesheet" href="/static/dist/bootstrap-5.3.8-dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="/static/dist/fontawesome-free-5.15.4-web/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .config-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        
+        .config-header {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        
+        .config-header h2 {
+            color: #333;
+            margin: 0;
+        }
+        
+        .config-header p {
+            color: #666;
+            margin: 10px 0 0 0;
+        }
+        
+        .section-title {
+            color: #333;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .section-title i {
+            margin-right: 10px;
+            color: #667eea;
+        }
+        
+        .global-settings {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 30px;
+            color: white;
+        }
+        
+        .global-settings h3 {
+            color: white;
+            margin: 0 0 15px 0;
+        }
+        
+        .setting-item {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .setting-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .setting-label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .setting-label i {
+            margin-right: 8px;
+            color: #667eea;
+        }
+        
+        .setting-desc {
+            color: #666;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+        
+        .gesture-card {
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .gesture-card:hover {
+            box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .gesture-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        
+        .gesture-info {
+            display: flex;
+            align-items: center;
+        }
+        
+        .gesture-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .gesture-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .gesture-action {
+            color: #999;
+            font-size: 13px;
+            margin-top: 3px;
+        }
+        
+        .gesture-desc {
+            color: #666;
+            margin-bottom: 18px;
+            line-height: 1.5;
+        }
+        
+        .switch-container {
+            display: flex;
+            align-items: center;
+        }
+        
+        .custom-switch {
+            position: relative;
+            width: 52px;
+            height: 28px;
+        }
+        
+        .custom-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 28px;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 22px;
+            width: 22px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        
+        .status-enabled {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .status-disabled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .config-item {
+            margin-bottom: 18px;
+        }
+        
+        .config-item:last-child {
+            margin-bottom: 0;
+        }
+        
+        .config-item label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        .config-item input[type="range"] {
+            width: calc(100% - 80px);
+            vertical-align: middle;
+        }
+        
+        .config-item .range-value {
+            display: inline-block;
+            min-width: 60px;
+            text-align: right;
+            color: #667eea;
+            font-weight: bold;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        
+        .btn-save {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 10px 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 500;
+        }
+        
+        .btn-save:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 14px rgba(102, 126, 234, 0.4);
+        }
+        
+        .toast {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.85);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 6px;
+            font-size: 14px;
+            z-index: 10000;
+            display: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .toast.show {
+            display: block;
+            animation: slideDown 0.3s ease-out;
+        }
+        
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(0);
+            }
+        }
+        
+        .toast.success {
+            background: #4CAF50;
+        }
+        
+        .toast.error {
+            background: #f44336;
+        }
+        
+        .camera-status {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-radius: 6px;
+            margin-top: 10px;
+        }
+        
+        .camera-status.checking {
+            background: #fff3cd;
+            color: #856404;
+        }
+        
+        .camera-status.granted {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .camera-status.denied {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .camera-status i {
+            margin-right: 8px;
+            font-size: 18px;
+        }
+        
+        .btn-check-camera {
+            background: rgba(255, 255, 255, 0.95);
+            color: #333;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-check-camera:hover {
+            background: white;
+            transform: scale(1.05);
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top: 2px solid white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 8px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="toast" id="toast"></div>
+    
+    <!-- XSRF Token -->
+    <input type="hidden" id="xsrf_token" name="_xsrf" value="{{ xsrf_token }}">
+    
+    <div class="config-container">
+        <div class="config-header">
+            <h2><i class="fas fa-hand-paper"></i> 手势配置管理</h2>
+            <p>配置手势识别参数、悬浮窗显示和摄像头权限，实现智能手势交互控制</p>
+        </div>
+        
+        <!-- 全局设置 -->
+        <div class="global-settings">
+            <h3><i class="fas fa-cog"></i> 全局设置</h3>
+            
+            <div class="setting-item">
+                <div class="setting-label">
+                    <i class="fas fa-window-maximize"></i> 悬浮窗开关
+                </div>
+                <div class="setting-desc">
+                    开启后将在页面右下角显示手势控制悬浮按钮，点击可启动/停止手势识别功能
+                </div>
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <label class="switch-container">
+                        <span style="margin-right: 12px; color: #555;">启用悬浮窗</span>
+                        <div class="custom-switch">
+                            <input type="checkbox" id="floatingWindowToggle" checked onchange="toggleFloatingWindow(this.checked)">
+                            <span class="slider"></span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="setting-item">
+                <div class="setting-label">
+                    <i class="fas fa-video"></i> 摄像头权限
+                </div>
+                <div class="setting-desc">
+                    手势识别需要使用摄像头进行实时视频捕获，请确保已授权摄像头访问权限
+                </div>
+                <button class="btn-check-camera" onclick="checkCameraPermission()">
+                    <i class="fas fa-check-circle"></i> 检查摄像头权限
+                </button>
+                <div id="cameraStatus" class="camera-status checking" style="display: none;">
+                    <i class="fas fa-circle-notch fa-spin"></i>
+                    正在检查摄像头权限...
+                </div>
+            </div>
+        </div>
+        
+        <!-- 手势配置列表 -->
+        <div class="section-title">
+            <i class="fas fa-hand-point-up"></i> 手势动作配置
+        </div>
+        
+        <div id="gesture-configs">
+            <div style="text-align: center; padding: 40px; color: #999;">
+                <i class="fas fa-spinner fa-spin" style="font-size: 32px;"></i>
+                <p style="margin-top: 10px;">加载中...</p>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            <a href="/admin" class="btn btn-secondary btn-lg">
+                <i class="fas fa-arrow-left"></i> 返回后台
+            </a>
+        </div>
+    </div>
+    
+    <script src="/static/dist/bootstrap-5.3.8-dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // 获取XSRF token
+        function getXsrfToken() {
+            const token = document.getElementById('xsrf_token');
+            return token ? token.value : '';
+        }
+        
+        // 显示提示消息
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast ' + type + ' show';
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // 切换悬浮窗显示
+        function toggleFloatingWindow(enabled) {
+            const container = document.getElementById('gesture-control-container');
+            
+            if (enabled) {
+                if (container) {
+                    container.style.display = 'block';
+                } else {
+                    // 如果外部UI还没创建，等待一下或提示用户刷新
+                    setTimeout(() => {
+                        const newContainer = document.getElementById('gesture-control-container');
+                        if (newContainer) {
+                            newContainer.style.display = 'block';
+                        }
+                    }, 300);
+                }
+                showToast('悬浮窗已开启', 'success');
+            } else {
+                if (container) {
+                    container.style.display = 'none';
+                }
+                // 如果手势识别正在运行，停止它
+                if (window.gestureUI && window.gestureUI.getStatus().isRecognizing) {
+                    window.gestureUI.stopGestureRecognition();
+                }
+                showToast('悬浮窗已关闭', 'success');
+            }
+            
+            // 保存设置到本地存储
+            localStorage.setItem('gesture_floating_window_enabled', enabled);
+        }
+        
+        // 检查摄像头权限
+        async function checkCameraPermission() {
+            const statusDiv = document.getElementById('cameraStatus');
+            statusDiv.style.display = 'flex';
+            statusDiv.className = 'camera-status checking';
+            statusDiv.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> 正在请求摄像头权限...';
+            
+            try {
+                // 尝试获取摄像头权限
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 320 },
+                        height: { ideal: 240 }
+                    } 
+                });
+                
+                // 停止流（只是测试权限）
+                stream.getTracks().forEach(track => track.stop());
+                
+                statusDiv.className = 'camera-status granted';
+                statusDiv.innerHTML = '<i class="fas fa-check-circle"></i> 摄像头权限已授予 ✓';
+                
+                showToast('摄像头权限验证成功！可以开始使用手势识别功能了', 'success');
+                
+            } catch (error) {
+                console.error('摄像头权限错误:', error);
+                
+                let errorMessage = '';
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = '摄像头权限被拒绝。请在浏览器设置中允许访问摄像头';
+                    statusDiv.className = 'camera-status denied';
+                    statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> 摄像头权限被拒绝 ✗';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = '未检测到摄像头设备。请确认电脑已连接摄像头';
+                    statusDiv.className = 'camera-status denied';
+                    statusDiv.innerHTML = '<i class="fas fa-exclamation-triangle"></i> 未找到摄像头设备 ⚠';
+                } else {
+                    errorMessage = '无法访问摄像头：' + error.message;
+                    statusDiv.className = 'camera-status denied';
+                    statusDiv.innerHTML = '<i class="fas fa-times-circle"></i> 摄像头访问失败 ✗';
+                }
+                
+                showToast(errorMessage, 'error');
+            }
+        }
+        
+        // 加载手势配置
+        function loadGestureConfigs() {
+            fetch('/api/gesture/config')
+                .then(response => response.json())
+                .then(data => {
+                    renderGestureConfigs(data);
+                })
+                .catch(error => {
+                    showToast('加载配置失败: ' + error.message, 'error');
+                    document.getElementById('gesture-configs').innerHTML = 
+                        '<div style="text-align: center; padding: 40px; color: #f44336;"><i class="fas fa-exclamation-triangle" style="font-size: 32px;"></i><p style="margin-top: 10px;">加载失败，请刷新页面重试</p></div>';
+                });
+        }
+        
+        // 渲染手势配置卡片
+        function renderGestureConfigs(configs) {
+            const container = document.getElementById('gesture-configs');
+            container.innerHTML = '';
+            
+            configs.forEach((config, index) => {
+                const card = document.createElement('div');
+                card.className = 'gesture-card';
+                card.dataset.gesture = config.gesture_name;
+                card.style.animationDelay = `${index * 0.1}s`;
+                
+                // 根据手势类型选择图标
+                let iconClass = '';
+                switch(config.gesture_name) {
+                    case 'thumbs_up':
+                        iconClass = 'fa-thumbs-up';
+                        break;
+                    case 'open_palm':
+                        iconClass = 'fa-hand-paper';
+                        break;
+                    case 'victory':
+                        iconClass = 'fa-hand-peace';
+                        break;
+                    case 'pointing':
+                        iconClass = 'fa-hand-point-up';
+                        break;
+                    case 'call_me':
+                        iconClass = 'fa-phone';
+                        break;
+                    default:
+                        iconClass = 'fa-hand-paper';
+                }
+                
+                card.innerHTML = `
+                    <div class="gesture-header">
+                        <div class="gesture-info">
+                            <div class="gesture-icon">
+                                <i class="fas ${iconClass}"></i>
+                            </div>
+                            <div>
+                                <div class="gesture-name">${config.display_name}</div>
+                                <div class="gesture-action">${getActionDescription(config.action)}</div>
+                            </div>
+                            <span class="status-badge ${config.enabled ? 'status-enabled' : 'status-disabled'}">
+                                ${config.enabled ? '已启用' : '已禁用'}
+                            </span>
+                        </div>
+                        
+                        <div class="switch-container">
+                            <div class="custom-switch">
+                                <input type="checkbox" 
+                                       id="switch-${config.gesture_name}" 
+                                       ${config.enabled ? 'checked' : ''}
+                                       onchange="toggleGesture('${config.gesture_name}', this.checked)">
+                                <span class="slider"></span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="gesture-desc">${config.description}</div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="config-item">
+                                <label>识别灵敏度阈值 (像素)</label>
+                                <div style="display: flex; align-items: center;">
+                                    <input type="range" 
+                                           id="threshold-${config.gesture_name}" 
+                                           min="10" 
+                                           max="100" 
+                                           value="${config.sensitivity_threshold}"
+                                           oninput="updateRangeValue(this, 'threshold-value-${config.gesture_name}')">
+                                    <span class="range-value" id="threshold-value-${config.gesture_name}">${config.sensitivity_threshold}</span>
+                                </div>
+                                <small style="color: #999;">值越小越灵敏，建议范围 30-70</small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="config-item">
+                                <label>手势保持时间 (毫秒)</label>
+                                <div style="display: flex; align-items: center;">
+                                    <input type="range" 
+                                           id="holdtime-${config.gesture_name}" 
+                                           min="200" 
+                                           max="1500" 
+                                           step="100"
+                                           value="${config.hold_time}"
+                                           oninput="updateRangeValue(this, 'holdtime-value-${config.gesture_name}')">
+                                    <span class="range-value" id="holdtime-value-${config.gesture_name}">${config.hold_time}ms</span>
+                                </div>
+                                <small style="color: #999;">防止误触，建议范围 500-800ms</small>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="text-align: right; margin-top: 18px; padding-top: 15px; border-top: 1px solid #f0f0f0;">
+                        <button class="btn-save" onclick="saveConfig('${config.gesture_name}')">
+                            <i class="fas fa-save"></i> 保存配置
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(card);
+            });
+        }
+        
+        // 获取动作描述
+        function getActionDescription(action) {
+            const actions = {
+                'goBack': '全局返回/退出当前子页面',
+                'refreshPage': '全局刷新/重新加载当前模块数据',
+                'openNotificationCenter': '打开消息通知中心',
+                'takeScreenshot': '全屏截图并保存到本地',
+                'toggleVoiceReading': '切换语音朗读开关'
+            };
+            return actions[action] || action;
+        }
+        
+        // 更新范围值显示
+        function updateRangeValue(input, valueId) {
+            const valueElement = document.getElementById(valueId);
+            if (valueId.includes('holdtime')) {
+                valueElement.textContent = input.value + 'ms';
+            } else {
+                valueElement.textContent = input.value;
+            }
+        }
+        
+        // 启用/禁用手势
+        function toggleGesture(gestureName, enabled) {
+            const xsrfToken = getXsrfToken();
+            
+            fetch('/api/gesture/toggle', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-XSRFToken': xsrfToken
+                },
+                body: JSON.stringify({
+                    gesture_name: gestureName,
+                    enabled: enabled
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                    
+                    // 更新状态标签
+                    const card = document.querySelector(`[data-gesture="${gestureName}"]`);
+                    if (card) {
+                        const badge = card.querySelector('.status-badge');
+                        if (badge) {
+                            badge.className = `status-badge ${enabled ? 'status-enabled' : 'status-disabled'}`;
+                            badge.textContent = enabled ? '已启用' : '已禁用';
+                        }
+                    }
+                } else {
+                    showToast(data.error || '操作失败', 'error');
+                    loadGestureConfigs();
+                }
+            })
+            .catch(error => {
+                showToast('操作失败: ' + error.message, 'error');
+                loadGestureConfigs();
+            });
+        }
+        
+        // 保存配置
+        function saveConfig(gestureName) {
+            const xsrfToken = getXsrfToken();
+            const threshold = document.getElementById(`threshold-${gestureName}`).value;
+            const holdTime = document.getElementById(`holdtime-${gestureName}`).value;
+            
+            const button = event.target;
+            const originalText = button.innerHTML;
+            button.innerHTML = '<span class="loading-spinner"></span> 保存中...';
+            button.disabled = true;
+            
+            fetch('/api/gesture/config', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-XSRFToken': xsrfToken
+                },
+                body: JSON.stringify({
+                    gesture_name: gestureName,
+                    sensitivity_threshold: parseInt(threshold),
+                    hold_time: parseInt(holdTime)
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast(data.message, 'success');
+                } else {
+                    showToast(data.error || '保存失败', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('保存失败: ' + error.message, 'error');
+            })
+            .finally(() => {
+                button.innerHTML = originalText;
+                button.disabled = false;
+            });
+        }
+        
+        // 初始化手势UI（简化版）
+        function initGestureUI() {
+            if (document.getElementById('gesture-control-container')) return;
+            
+            const container = document.createElement('div');
+            container.id = 'gesture-control-container';
+            container.style.cssText = `
+                position: fixed;
+                bottom: 20px;
+                right: 20px;
+                z-index: 9998;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            `;
+            
+            const toggleButton = document.createElement('div');
+            toggleButton.id = 'gesture-toggle-button';
+            toggleButton.style.cssText = `
+                width: 60px;
+                height: 60px;
+                border-radius: 50%;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+                cursor: pointer;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition: all 0.3s ease;
+                position: relative;
+            `;
+            
+            toggleButton.innerHTML = `
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2">
+                    <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0"></path>
+                    <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2"></path>
+                    <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8"></path>
+                    <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"></path>
+                </svg>
+                <div style="position: absolute; top: -8px; right: -8px; width: 20px; height: 20px; border-radius: 50%; background: #ff4444; border: 2px solid white;" id="gestureStatusIndicator"></div>
+            `;
+            
+            toggleButton.addEventListener('mouseenter', () => {
+                toggleButton.style.transform = 'scale(1.1)';
+            });
+            
+            toggleButton.addEventListener('mouseleave', () => {
+                toggleButton.style.transform = 'scale(1)';
+            });
+            
+            toggleButton.addEventListener('click', () => {
+                if (window.gestureUI) {
+                    window.gestureUI.toggleGestureRecognition();
+                } else {
+                    showToast('手势控制系统正在加载，请稍候...', 'info');
+                    // 延迟重试
+                    setTimeout(() => {
+                        if (window.gestureUI) {
+                            window.gestureUI.toggleGestureRecognition();
+                        } else {
+                            showToast('手势控制系统加载失败，请刷新页面', 'error');
+                        }
+                    }, 500);
+                }
+            });
+            
+            container.appendChild(toggleButton);
+            document.body.appendChild(container);
+        }
+        
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 加载手势配置
+            loadGestureConfigs();
+            
+            // 检查本地存储的悬浮窗状态
+            const floatingWindowEnabled = localStorage.getItem('gesture_floating_window_enabled');
+            if (floatingWindowEnabled === null) {
+                localStorage.setItem('gesture_floating_window_enabled', 'true');
+            }
+            
+            // 外部脚本加载后会自动初始化，这里不需要手动调用
+        });
+    </script>
+    
+    <!-- 引入手势控制系统 -->
+    <script src="/gesture_control/frontend/gesture_loader.js"></script>
+    
+</body>
+</html>

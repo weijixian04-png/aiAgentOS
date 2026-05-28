@@ -3,8 +3,10 @@ import tornado.web
 from tornado.httpserver import HTTPServer
 import os
 
-from app.models.db import init_db, init_scout_sources, init_api_interfaces, init_digital_employees
+from app.models.db import init_db, init_default_users, init_scout_sources, init_api_interfaces, init_digital_employees, init_sentiment_samples
 from app.models.user import UserRepository
+from app.models.gesture_config import GestureConfigRepository
+from app.models.crawl_task import CrawlTaskRepository, CrawlLogRepository
 
 # 导入控制器
 from app.controllers.auth import LoginHandler, LogoutHandler, UserLoginHandler, RegisterHandler
@@ -20,8 +22,17 @@ from app.controllers.interface import InterfaceListHandler, InterfaceApiHandler
 from app.controllers.warehouse import WarehouseListHandler, WarehouseApiHandler, WarehouseDetailHandler, WarehouseStatsApiHandler
 from app.controllers.deep_collect import DeepCollectListHandler, DeepCollectApiHandler, DeepCollectStatsApiHandler
 from app.controllers.chat import ChatHandler, ChatApiHandler, ChatSessionListHandler
+from app.controllers.friend_chat import FriendChatHandler
+from app.controllers.friendship import FriendApiHandler, PrivateChatApiHandler
+from app.controllers.group_chat import GroupChatApiHandler
+from app.controllers.chat_system import ChatSystemHandler
+from app.controllers.admin_group import AdminGroupHandler, AdminGroupApiHandler, AdminFileHandler, AdminFileApiHandler, AdminServerHandler, AdminServerApiHandler
 from app.controllers.datav import DataVListHandler, DataVScreenHandler, DataVApiHandler, DataVStatsApiHandler, DataVLocationApiHandler, DataVCacheClearHandler
 from app.controllers.sentiment import SentimentListHandler, SentimentApiHandler, SentimentStatsApiHandler, SentimentAnalyzeHandler, SentimentDetailHandler
+from app.controllers.gesture import GestureDemoHandler
+from app.controllers.gesture_static import GestureStaticFileHandler
+from app.controllers.gesture_config import GestureConfigListHandler, GestureConfigApiHandler, GestureToggleApiHandler
+from app.controllers.crawl_task import CrawlTaskListHandler, CrawlTaskApiHandler, CrawlLogListHandler, CrawlLogApiHandler, CrawlLogDetailHandler
 from wechat_chat.backend.chat_routes import get_chat_routes
 
 def make_app():
@@ -111,6 +122,39 @@ def make_app():
             (r"/chat", ChatHandler),
             (r"/api/chat", ChatApiHandler),
             (r"/api/chat/sessions", ChatSessionListHandler),
+            
+            # 好友聊天路由
+            (r"/chat/friend", FriendChatHandler),
+            (r"/api/friend", FriendApiHandler),
+            (r"/api/chat/private", PrivateChatApiHandler),
+            
+            # 群聊路由
+            (r"/chat/system", ChatSystemHandler),
+            (r"/api/group", GroupChatApiHandler),
+            
+            # 后台管理路由
+            (r"/admin/group", AdminGroupHandler),
+            (r"/api/admin/group", AdminGroupApiHandler),
+            (r"/admin/file", AdminFileHandler),
+            (r"/api/admin/file", AdminFileApiHandler),
+            (r"/admin/server", AdminServerHandler),
+            (r"/api/admin/server", AdminServerApiHandler),
+            
+            # 手势交互路由
+            (r"/gesture/demo", GestureDemoHandler),
+            (r"/gesture_control/(.*)", GestureStaticFileHandler, {"path": "gesture_control"}),
+            
+            # 手势配置管理路由
+            (r"/admin/gesture", GestureConfigListHandler),
+            (r"/api/gesture/config", GestureConfigApiHandler),
+            (r"/api/gesture/toggle", GestureToggleApiHandler),
+
+            # 定时爬取路由
+            (r"/admin/crawl", CrawlTaskListHandler),
+            (r"/api/crawl_task", CrawlTaskApiHandler),
+            (r"/admin/crawl/logs", CrawlLogListHandler),
+            (r"/api/crawl_log", CrawlLogApiHandler),
+            (r"/api/crawl_log/(\d+)", CrawlLogDetailHandler),
         ]
     
     # 整合子系统路由
@@ -138,16 +182,54 @@ def init_admin_user():
             UserRepository.update_user(user["id"], role="admin")
             print("已更新admin用户角色为超级管理员")
 
+def _init_default_crawl_tasks():
+    """初始化默认爬取任务"""
+    default_tasks = [
+        {
+            "task_name": "百度新闻-四川农业大学",
+            "url": "https://www.baidu.com/s?rtt=1&bsst=1&cl=2&tn=news&rsv_dl=ns_pc&word=%E5%9B%9B%E5%B7%9D%E5%86%9C%E4%B8%9A%E5%A4%A7%E5%AD%A6",
+            "cron_expr": "0 */2 * * *",
+            "extract_rule": "text",
+            "status": 1
+        }
+    ]
+    existing = CrawlTaskRepository.get_all(1, 100)
+    existing_names = [t['task_name'] for t in existing]
+    for task in default_tasks:
+        if task['task_name'] not in existing_names:
+            CrawlTaskRepository.create(
+                task['task_name'], task['url'],
+                task['cron_expr'], task['extract_rule'],
+                task['status']
+            )
+            print(f"已创建默认爬取任务: {task['task_name']}")
+
 if __name__ == "__main__":
     init_db()
+    init_default_users()
     init_admin_user()
     init_scout_sources()
     init_api_interfaces()
     init_digital_employees()
+    init_sentiment_samples()
+    
+    # 初始化手势配置
+    GestureConfigRepository.init_gesture_config_table()
+    GestureConfigRepository.init_default_gesture_configs()
+    
+    # 初始化定时爬取模块
+    CrawlTaskRepository.init_table()
+    CrawlLogRepository.init_table()
+    
+    # 初始化默认爬取任务
+    _init_default_crawl_tasks()
     
     app = make_app()
-    server = HTTPServer(app)
-    server.bind(10086)
-    server.start()
-    print("====== Server 启动成功 ====== 端口：10086 =======", flush=True)
+    app.listen(1086)
+    print("====== Server 启动成功 ====== 端口：1086 =======", flush=True)
+    
+    # 启动爬取调度器
+    from crawl_scheduler.backend.scheduler import init_scheduler
+    init_scheduler()
+    
     tornado.ioloop.IOLoop.current().start()

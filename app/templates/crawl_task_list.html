@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定时爬取 - cnAgentOS管理系统</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f5f5; }
+        .layui-layout-admin .layui-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .layui-header .layui-logo { color: white; font-size: 18px; font-weight: 600; padding: 0 30px; }
+        .layui-nav-item a { color: white !important; }
+        .layui-nav-item:hover { background: rgba(255,255,255,0.1); }
+        .layui-side { background: #2f4050; width: 200px; }
+        .layui-side-scroll { width: 220px; }
+        .layui-nav-tree .layui-nav-item a { color: #a7b1c2; height: 45px; line-height: 45px; padding-left: 25px; }
+        .layui-nav-tree .layui-nav-item a:hover { color: white; background: #293846; }
+        .layui-nav-tree .layui-nav-item.layui-nav-itemed>a { background: #1ab394 !important; color: white; }
+        .layui-body { background: #f3f3f4; left: 200px; padding: 20px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 20px; font-weight: 600; color: #676a6c; }
+        .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+        .status-badge.enabled { background: rgba(46, 213, 115, 0.2); color: #2ed573; }
+        .status-badge.disabled { background: rgba(255, 107, 107, 0.2); color: #ff6b6b; }
+        .cron-help { font-size: 12px; color: #999; margin-top: 4px; }
+        .extract-rule-desc { font-size: 12px; color: #666; margin-top: 4px; }
+    </style>
+</head>
+<body class="layui-layout-body">
+    <div class="layui-layout layui-layout-admin">
+        <div class="layui-header">
+            <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+                <li class="layui-nav-item"><a href="/auth/logout"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+            </ul>
+        </div>
+
+        <div class="layui-side layui-bg-black">
+            <div class="layui-side-scroll">
+                <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-engine"></i> 定时爬取</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/crawl" style="color:#1ab394;">爬取任务</a></dd>
+                            <dd><a href="/admin/crawl/logs">爬取日志</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="/admin"><i class="layui-icon layui-icon-home"></i> 返回首页</a></li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="layui-body">
+            <div class="page-header">
+                <h2 class="page-title">定时爬取任务</h2>
+                <div>
+                    <button type="button" class="layui-btn" id="addBtn">
+                        <i class="layui-icon layui-icon-add-1"></i> 新增任务
+                    </button>
+                    <a href="/admin/crawl/logs" class="layui-btn layui-btn-normal">
+                        <i class="layui-icon layui-icon-log"></i> 查看日志
+                    </a>
+                </div>
+            </div>
+            <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+            <table id="crawlTable" class="layui-table"></table>
+        </div>
+    </div>
+
+    <div style="display: none;" id="taskModal">
+        <form class="layui-form" id="taskForm" style="padding: 20px;">
+            <input type="hidden" name="id" id="formId">
+            <div class="layui-form-item">
+                <label class="layui-form-label">任务名称</label>
+                <div class="layui-input-block">
+                    <input type="text" name="task_name" id="formTaskName" lay-verify="required"
+                           placeholder="请输入任务名称" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">爬取URL</label>
+                <div class="layui-input-block">
+                    <input type="text" name="url" id="formUrl" lay-verify="required"
+                           placeholder="https://example.com" class="layui-input">
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">Cron表达式</label>
+                <div class="layui-input-block">
+                    <input type="text" name="cron_expr" id="formCronExpr" lay-verify="required"
+                           placeholder="0 * * * *" class="layui-input" value="0 * * * *">
+                    <div class="cron-help">格式: 分 时 日 月 周，例如: 0 */2 * * * (每2小时执行)</div>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">提取规则</label>
+                <div class="layui-input-block">
+                    <select name="extract_rule" id="formExtractRule" lay-filter="extractRule">
+                        <option value="title">网页标题</option>
+                        <option value="text">全部文本内容(前500字)</option>
+                        <option value="css_custom">指定CSS选择器</option>
+                    </select>
+                </div>
+            </div>
+            <div class="layui-form-item" id="cssSelectorRow" style="display:none;">
+                <label class="layui-form-label">CSS选择器</label>
+                <div class="layui-input-block">
+                    <input type="text" name="css_selector" id="formCssSelector"
+                           placeholder="如: .news-list li a" class="layui-input">
+                    <div class="extract-rule-desc">输入CSS选择器，提取匹配元素的文本内容(前500字)</div>
+                </div>
+            </div>
+            <div class="layui-form-item">
+                <label class="layui-form-label">启用状态</label>
+                <div class="layui-input-block">
+                    <input type="checkbox" name="status" id="formStatus" lay-skin="switch" checked>
+                </div>
+            </div>
+            <div class="layui-form-item" style="text-align: right;">
+                <button type="button" class="layui-btn layui-btn-normal" id="formCancel">取消</button>
+                <button type="button" class="layui-btn" lay-submit lay-filter="taskSubmit">确认</button>
+            </div>
+        </form>
+    </div>
+
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        layui.use(['table', 'layer', 'form'], function() {
+            var table = layui.table;
+            var layer = layui.layer;
+            var form = layui.form;
+            var $ = layui.$;
+
+            var tableIns = table.render({
+                elem: '#crawlTable',
+                url: '/api/crawl_task',
+                method: 'get',
+                page: true,
+                limit: 10,
+                limits: [10, 20, 50],
+                id: 'crawlTableId',
+                cols: [[
+                    {field: 'id', title: 'ID', width: 70, sort: true},
+                    {field: 'task_name', title: '任务名称', width: 160},
+                    {field: 'url', title: 'URL', width: 280, templet: function(d) {
+                        var url = d.url || '';
+                        if (url.length > 40) url = url.substring(0, 40) + '...';
+                        return '<span title="' + escapeHtml(d.url || '') + '">' + escapeHtml(url) + '</span>';
+                    }},
+                    {field: 'cron_expr', title: 'Cron表达式', width: 130},
+                    {field: 'extract_rule', title: '提取规则', width: 140, templet: function(d) {
+                        var rule = d.extract_rule || 'title';
+                        if (rule === 'title') return '网页标题';
+                        if (rule === 'text') return '全部文本(前500字)';
+                        if (rule.startsWith('css:')) return 'CSS选择器: ' + escapeHtml(rule.substring(4));
+                        return escapeHtml(rule);
+                    }},
+                    {field: 'status', title: '状态', width: 90, templet: function(d) {
+                        if (d.status == 1) return '<span class="status-badge enabled">启用</span>';
+                        return '<span class="status-badge disabled">禁用</span>';
+                    }},
+                    {field: 'last_run', title: '最后执行', width: 160},
+                    {field: 'next_run', title: '下次执行', width: 160},
+                    {title: '操作', width: 260, toolbar: '#barDemo', fixed: 'right'}
+                ]]
+            });
+
+            table.on('tool(crawlTable)', function(obj) {
+                var data = obj.data;
+                if (obj.event === 'edit') {
+                    editTask(data);
+                } else if (obj.event === 'del') {
+                    deleteTask(data.id, data.task_name);
+                } else if (obj.event === 'toggle') {
+                    toggleStatus(data.id, data.status);
+                } else if (obj.event === 'run_now') {
+                    runNow(data.id, data.task_name);
+                }
+            });
+
+            $('#addBtn').click(function() {
+                $('#taskForm')[0].reset();
+                $('#formId').val('');
+                $('#formCronExpr').val('0 * * * *');
+                $('#formExtractRule').val('title');
+                $('#formStatus').prop('checked', true);
+                $('#cssSelectorRow').hide();
+                form.render();
+                layer.open({
+                    type: 1,
+                    title: '新增爬取任务',
+                    content: $('#taskModal'),
+                    area: ['580px', '480px'],
+                    closeBtn: 1
+                });
+            });
+
+            function editTask(data) {
+                $('#formId').val(data.id);
+                $('#formTaskName').val(data.task_name);
+                $('#formUrl').val(data.url);
+                $('#formCronExpr').val(data.cron_expr);
+                $('#formStatus').prop('checked', data.status == 1);
+
+                var rule = data.extract_rule || 'title';
+                if (rule.startsWith('css:')) {
+                    $('#formExtractRule').val('css_custom');
+                    $('#formCssSelector').val(rule.substring(4));
+                    $('#cssSelectorRow').show();
+                } else {
+                    $('#formExtractRule').val(rule);
+                    $('#cssSelectorRow').hide();
+                }
+                form.render();
+                layer.open({
+                    type: 1,
+                    title: '编辑爬取任务',
+                    content: $('#taskModal'),
+                    area: ['580px', '480px'],
+                    closeBtn: 1
+                });
+            }
+
+            form.on('select(extractRule)', function(data) {
+                if (data.value === 'css_custom') {
+                    $('#cssSelectorRow').show();
+                } else {
+                    $('#cssSelectorRow').hide();
+                }
+            });
+
+            function deleteTask(id, name) {
+                layer.confirm('确定要删除任务 "' + name + '" 吗？相关的爬取日志也会被删除。', function(index) {
+                    $.ajax({
+                        url: '/api/crawl_task',
+                        type: 'post',
+                        data: { action: 'delete', id: id, _xsrf: document.getElementById('xsrf_token').value },
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg(res.msg, {icon: 1});
+                                tableIns.reload();
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            }
+
+            function toggleStatus(id, status) {
+                var action = status == 1 ? '禁用' : '启用';
+                layer.confirm('确定要' + action + '这个任务吗？', function(index) {
+                    $.ajax({
+                        url: '/api/crawl_task',
+                        type: 'post',
+                        data: { action: 'toggle', id: id, _xsrf: document.getElementById('xsrf_token').value },
+                        success: function(res) {
+                            if (res.code === 0) {
+                                layer.msg(res.msg, {icon: 1});
+                                tableIns.reload();
+                            } else {
+                                layer.msg(res.msg, {icon: 2});
+                            }
+                        }
+                    });
+                    layer.close(index);
+                });
+            }
+
+            function runNow(id, name) {
+                var loading = layer.load(2);
+                $.ajax({
+                    url: '/api/crawl_task',
+                    type: 'post',
+                    data: { action: 'run_now', id: id, _xsrf: document.getElementById('xsrf_token').value },
+                    success: function(res) {
+                        layer.close(loading);
+                        if (res.code === 0) {
+                            layer.msg('执行成功！' + (res.data.summary ? ' 结果: ' + res.data.summary.substring(0, 80) : ''), {icon: 1, time: 3000});
+                            tableIns.reload();
+                        } else {
+                            layer.msg('执行失败: ' + res.msg, {icon: 2});
+                        }
+                    },
+                    error: function() {
+                        layer.close(loading);
+                        layer.msg('请求失败', {icon: 2});
+                    }
+                });
+            }
+
+            form.on('submit(taskSubmit)', function(data) {
+                var action = $('#formId').val() ? 'edit' : 'add';
+                var extractRule = $('#formExtractRule').val();
+                if (extractRule === 'css_custom') {
+                    var selector = $('#formCssSelector').val().trim();
+                    if (!selector) {
+                        layer.msg('请输入CSS选择器', {icon: 2});
+                        return false;
+                    }
+                    extractRule = 'css:' + selector;
+                }
+
+                $.ajax({
+                    url: '/api/crawl_task',
+                    type: 'post',
+                    data: {
+                        action: action,
+                        id: $('#formId').val(),
+                        task_name: $('#formTaskName').val(),
+                        url: $('#formUrl').val(),
+                        cron_expr: $('#formCronExpr').val(),
+                        extract_rule: extractRule,
+                        status: $('#formStatus').prop('checked') ? '1' : '0',
+                        _xsrf: document.getElementById('xsrf_token').value
+                    },
+                    success: function(res) {
+                        if (res.code === 0) {
+                            layer.msg(res.msg, {icon: 1});
+                            layer.closeAll();
+                            tableIns.reload();
+                        } else {
+                            layer.msg(res.msg, {icon: 2});
+                        }
+                    }
+                });
+                return false;
+            });
+
+            $('#formCancel').click(function() {
+                layer.closeAll();
+            });
+
+            $('#refreshBtn').click(function() {
+                tableIns.reload();
+            });
+
+            function escapeHtml(text) {
+                var map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
+                return String(text).replace(/[&<>"']/g, function(m) { return map[m]; });
+            }
+        });
+    </script>
+
+    <script type="text/html" id="barDemo">
+        <a class="layui-btn layui-btn-xs layui-btn-normal" lay-event="run_now">立即执行</a>
+        <a class="layui-btn layui-btn-xs" lay-event="toggle">启/禁</a>
+        <a class="layui-btn layui-btn-xs" lay-event="edit">编辑</a>
+        <a class="layui-btn layui-btn-danger layui-btn-xs" lay-event="del">删除</a>
+    </script>
+</body>
+</html>

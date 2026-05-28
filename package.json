@@ -1,0 +1,26 @@
+{
+  "name": "cnAgentOS",
+  "version": "1.0.0",
+  "description": "cnAgentOS 是一个基于 Tornado Web 框架的 B/S 架构系统，采用 MVC 设计模式，目前已实现用户登录功能。",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Y11482/cnAgentOS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Y11482/cnAgentOS/issues"
+  },
+  "homepage": "https://github.com/Y11482/cnAgentOS#readme",
+  "dependencies": {
+    "@mediapipe/camera_utils": "^0.3.1675466862",
+    "@mediapipe/drawing_utils": "^0.3.1675466124",
+    "@mediapipe/hands": "^0.4.1675469240",
+    "html2canvas": "^1.4.1"
+  }
+}
