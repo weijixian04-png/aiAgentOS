@@ -101,12 +101,19 @@ def init_db():
 				api_interface_id INTEGER,
 				avatar TEXT,
 				welcome_msg TEXT,
+				sort_order INTEGER DEFAULT 0,
 				enabled INTEGER DEFAULT 1,
 				create_at TEXT NOT NULL DEFAULT(datetime('now')),
 				update_at TEXT NOT NULL DEFAULT(datetime('now'))
 			)
 			"""
 		)
+		# 如果表已存在，添加sort_order字段（如果不存在）
+		try:
+			conn.execute("ALTER TABLE digital_employee ADD COLUMN sort_order INTEGER DEFAULT 0")
+			conn.commit()
+		except sqlite3.OperationalError:
+			pass  # 字段已存在
 		
 		conn.execute(
 			"""

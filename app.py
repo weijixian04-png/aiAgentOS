@@ -3,6 +3,16 @@ import tornado.web
 from tornado.httpserver import HTTPServer
 import os
 
+# 在导入任何crawl4ai相关模块之前设置环境变量
+os.environ['CRAWL4AI_BASE_DIR'] = os.path.join(os.path.dirname(__file__), 'data', 'crawl4ai')
+# 确保目录存在
+crawl4ai_base = os.environ['CRAWL4AI_BASE_DIR']
+os.makedirs(os.path.join(crawl4ai_base, 'html_content'), exist_ok=True)
+os.makedirs(os.path.join(crawl4ai_base, 'cleaned_html'), exist_ok=True)
+os.makedirs(os.path.join(crawl4ai_base, 'images'), exist_ok=True)
+os.makedirs(os.path.join(crawl4ai_base, 'markdown_content'), exist_ok=True)
+os.makedirs(os.path.join(crawl4ai_base, 'cache'), exist_ok=True)
+
 from app.models.db import init_db, init_default_users, init_scout_sources, init_api_interfaces, init_digital_employees, init_sentiment_samples
 from app.models.user import UserRepository
 from app.models.gesture_config import GestureConfigRepository
@@ -225,8 +235,8 @@ if __name__ == "__main__":
     _init_default_crawl_tasks()
     
     app = make_app()
-    app.listen(1086)
-    print("====== Server 启动成功 ====== 端口：1086 =======", flush=True)
+    app.listen(10086)
+    print("====== Server 启动成功 ====== 端口：10086 =======", flush=True)
     
     # 启动爬取调度器
     from crawl_scheduler.backend.scheduler import init_scheduler
