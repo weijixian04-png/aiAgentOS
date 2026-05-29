@@ -21,6 +21,7 @@ from app.models.crawl_task import CrawlTaskRepository, CrawlLogRepository
 # 导入控制器
 from app.controllers.auth import LoginHandler, LogoutHandler, UserLoginHandler, RegisterHandler
 from app.controllers.home import AdminHandler, IndexHandler, WelcomeHandler
+from app.controllers.database import DatabaseConfigHandler, DatabaseConfigApiHandler
 from app.controllers.user import UserListHandler, UserApiHandler, UserInfoHandler
 from app.controllers.model import ModelListHandler, ModelApiHandler, ModelTokenStatsHandler, ModelChatHandler, ModelChatApiHandler, ModelOptionsHandler
 from app.controllers.role import RoleListHandler, RoleApiHandler
@@ -59,6 +60,8 @@ def make_app():
             # 后台主页
             (r"/admin", AdminHandler),
             (r"/admin/welcome", WelcomeHandler),
+            (r"/admin/database", DatabaseConfigHandler),
+            (r"/api/database/config", DatabaseConfigApiHandler),
             
             # 用户管理路由
             (r"/admin/users", UserListHandler),

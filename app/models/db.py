@@ -1,14 +1,289 @@
+import json
 import os
+import re
 import sqlite3
+from datetime import date, datetime
 
 def _project_root():
 	return os.path.abspath(os.path.join(os.path.dirname(__file__),os.pardir,os.pardir))
 
+DEFAULT_SQLITE_PATH = os.path.join("database", "app.db")
 DB_PATH = os.path.join(_project_root(),"database","app.db")
+DB_CONFIG_PATH = os.path.join(_project_root(),"database","db_config.json")
+DEFAULT_DB_CONFIG = {
+	"type": "sqlite",
+	"sqlite_path": DEFAULT_SQLITE_PATH,
+	"mysql": {
+		"host": "127.0.0.1",
+		"port": 3306,
+		"user": "root",
+		"password": "",
+		"database": "ai_agent_os",
+		"charset": "utf8mb4"
+	}
+}
+MYSQL_LONGTEXT_COLUMNS = {
+	"headers", "raw_content", "content", "prompt", "welcome_msg", "summary",
+	"ai_analyze_msg", "ai_summary", "ai_keywords", "ai_sentiment", "ai_entities",
+	"config", "announcement", "images", "tags", "categories", "message", "remark",
+	"example", "description", "password_hash", "salt"
+}
+MYSQL_URL_COLUMNS = {"url", "base_url", "url_pattern", "source_url", "file_path"}
 
-def get_connection():
-	os.makedirs(os.path.dirname(DB_PATH),exist_ok=True)
-	conn = sqlite3.connect(DB_PATH)
+def _default_config_copy():
+	config = json.loads(json.dumps(DEFAULT_DB_CONFIG))
+	return config
+
+def _env_value(*names):
+	for name in names:
+		value = os.environ.get(name)
+		if value:
+			return value
+	return None
+
+def _normalize_db_type(db_type):
+	db_type = (db_type or "sqlite").strip().lower()
+	return db_type if db_type in ("sqlite", "mysql") else "sqlite"
+
+def get_database_config():
+	config = _default_config_copy()
+	if os.path.exists(DB_CONFIG_PATH):
+		try:
+			with open(DB_CONFIG_PATH, "r", encoding="utf-8") as file:
+				saved_config = json.load(file)
+			config.update({k: v for k, v in saved_config.items() if k != "mysql"})
+			config["mysql"].update(saved_config.get("mysql", {}))
+		except (OSError, json.JSONDecodeError):
+			pass
+
+	env_type = _env_value("DATABASE_TYPE", "DB_TYPE", "AIAgentOS_DB_TYPE")
+	if env_type:
+		config["type"] = env_type
+	env_sqlite_path = _env_value("SQLITE_PATH", "DB_SQLITE_PATH")
+	if env_sqlite_path:
+		config["sqlite_path"] = env_sqlite_path
+	mysql_env_map = {
+		"host": ("MYSQL_HOST", "DB_MYSQL_HOST"),
+		"port": ("MYSQL_PORT", "DB_MYSQL_PORT"),
+		"user": ("MYSQL_USER", "DB_MYSQL_USER"),
+		"password": ("MYSQL_PASSWORD", "DB_MYSQL_PASSWORD"),
+		"database": ("MYSQL_DATABASE", "DB_MYSQL_DATABASE"),
+		"charset": ("MYSQL_CHARSET", "DB_MYSQL_CHARSET")
+	}
+	for key, names in mysql_env_map.items():
+		value = _env_value(*names)
+		if value is not None:
+			config["mysql"][key] = value
+	config["type"] = _normalize_db_type(config.get("type"))
+	config["mysql"]["port"] = int(config["mysql"].get("port") or 3306)
+	if not config.get("sqlite_path"):
+		config["sqlite_path"] = DEFAULT_SQLITE_PATH
+	return config
+
+def save_database_config(config):
+	next_config = _default_config_copy()
+	current = get_database_config()
+	next_config.update({k: v for k, v in current.items() if k != "mysql"})
+	next_config["mysql"].update(current.get("mysql", {}))
+	next_config.update({k: v for k, v in config.items() if k != "mysql"})
+	next_config["mysql"].update(config.get("mysql", {}))
+	next_config["type"] = _normalize_db_type(next_config.get("type"))
+	next_config["mysql"]["port"] = int(next_config["mysql"].get("port") or 3306)
+	os.makedirs(os.path.dirname(DB_CONFIG_PATH), exist_ok=True)
+	with open(DB_CONFIG_PATH, "w", encoding="utf-8") as file:
+		json.dump(next_config, file, ensure_ascii=False, indent=2)
+	return next_config
+
+def get_database_status():
+	config = get_database_config()
+	if config["type"] == "mysql":
+		mysql_config = config["mysql"]
+		return {
+			"type": "mysql",
+			"detail": f"{mysql_config.get('user')}@{mysql_config.get('host')}:{mysql_config.get('port')}/{mysql_config.get('database')}"
+		}
+	return {"type": "sqlite", "detail": config.get("sqlite_path") or DEFAULT_SQLITE_PATH}
+
+def _quote_mysql_identifier(identifier):
+	identifier = (identifier or "").strip()
+	if not re.match(r"^[A-Za-z0-9_]+$", identifier):
+		raise ValueError("MySQL数据库名只能包含字母、数字和下划线")
+	return f"`{identifier}`"
+
+def _get_mysql_module():
+	try:
+		import pymysql
+		return pymysql
+	except ImportError as exc:
+		raise RuntimeError("使用MySQL数据库需要先安装PyMySQL依赖") from exc
+
+def _connect_mysql(config):
+	pymysql = _get_mysql_module()
+	mysql_config = config["mysql"]
+	connect_args = {
+		"host": mysql_config.get("host") or "127.0.0.1",
+		"port": int(mysql_config.get("port") or 3306),
+		"user": mysql_config.get("user") or "root",
+		"password": mysql_config.get("password") or "",
+		"database": mysql_config.get("database") or "ai_agent_os",
+		"charset": mysql_config.get("charset") or "utf8mb4",
+		"autocommit": False,
+		"cursorclass": pymysql.cursors.DictCursor
+	}
+	try:
+		return pymysql.connect(**connect_args)
+	except pymysql.err.OperationalError as exc:
+		if exc.args and exc.args[0] == 1049:
+			database = connect_args.pop("database")
+			setup_conn = pymysql.connect(**connect_args)
+			try:
+				with setup_conn.cursor() as cursor:
+					cursor.execute(f"CREATE DATABASE IF NOT EXISTS {_quote_mysql_identifier(database)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci")
+				setup_conn.commit()
+			finally:
+				setup_conn.close()
+			connect_args["database"] = database
+			return pymysql.connect(**connect_args)
+		raise
+
+def _mysql_text_type(column, rest):
+	upper_rest = rest.upper()
+	if "UNIQUE" in upper_rest or "DEFAULT" in upper_rest:
+		return "VARCHAR(255)"
+	if column in MYSQL_LONGTEXT_COLUMNS:
+		return "LONGTEXT"
+	if column in MYSQL_URL_COLUMNS:
+		return "VARCHAR(1024)"
+	return "VARCHAR(255)"
+
+def _adapt_mysql_column_line(line):
+	line = re.sub(r"\binteger\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", "INT AUTO_INCREMENT PRIMARY KEY", line, flags=re.IGNORECASE)
+	text_match = re.match(r"(\s*)([A-Za-z_][A-Za-z0-9_]*)(\s+)TEXT(\b.*)", line, flags=re.IGNORECASE)
+	if text_match:
+		column = text_match.group(2).lower()
+		rest = text_match.group(4)
+		if "DEFAULT CURRENT_TIMESTAMP" in rest.upper():
+			line = f"{text_match.group(1)}{text_match.group(2)}{text_match.group(3)}DATETIME{rest}"
+		else:
+			line = f"{text_match.group(1)}{text_match.group(2)}{text_match.group(3)}{_mysql_text_type(column, rest)}{rest}"
+	line = re.sub(r"\bINTEGER\b", "INT", line, flags=re.IGNORECASE)
+	line = re.sub(r"\bREAL\b", "DOUBLE", line, flags=re.IGNORECASE)
+	return line
+
+def _adapt_mysql_create_table(sql):
+	if not re.match(r"\s*CREATE\s+TABLE", sql, flags=re.IGNORECASE):
+		return sql
+	adapted = "\n".join(_adapt_mysql_column_line(line) for line in sql.splitlines())
+	if "ENGINE=" not in adapted.upper():
+		adapted = re.sub(r")\s*$", ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4", adapted.strip(), flags=re.DOTALL)
+	return adapted
+
+def _adapt_mysql_alter_table(sql):
+	if not re.match(r"\s*ALTER\s+TABLE", sql, flags=re.IGNORECASE):
+		return sql
+	sql = re.sub(r"\bADD\s+COLUMN\s+([A-Za-z_][A-Za-z0-9_]*)\s+TEXT\b", r"ADD COLUMN \1 VARCHAR(255)", sql, flags=re.IGNORECASE)
+	sql = re.sub(r"\bINTEGER\b", "INT", sql, flags=re.IGNORECASE)
+	sql = re.sub(r"\bREAL\b", "DOUBLE", sql, flags=re.IGNORECASE)
+	return sql
+
+def _adapt_mysql_sql(sql):
+	adapted = sql
+	adapted = re.sub(r"INSERT\s+OR\s+IGNORE\s+INTO", "INSERT IGNORE INTO", adapted, flags=re.IGNORECASE)
+	adapted = re.sub(r"INSERT\s+OR\s+REPLACE\s+INTO", "REPLACE INTO", adapted, flags=re.IGNORECASE)
+	adapted = re.sub(r"DEFAULT\s*\(\s*datetime\s*\(\s*'now'\s*\)\s*\)", "DEFAULT CURRENT_TIMESTAMP", adapted, flags=re.IGNORECASE)
+	adapted = re.sub(r"DEFAULT\s*\(\s*'([^']*)'\s*\)", r"DEFAULT '\1'", adapted, flags=re.IGNORECASE)
+	adapted = re.sub(r"DEFAULT\s*\(\s*([0-9.]+)\s*\)", r"DEFAULT \1", adapted, flags=re.IGNORECASE)
+	adapted = re.sub(r"datetime\s*\(\s*'now'\s*\)", "NOW()", adapted, flags=re.IGNORECASE)
+	adapted = re.sub(r"\binteger\s+PRIMARY\s+KEY\s+AUTOINCREMENT\b", "INT AUTO_INCREMENT PRIMARY KEY", adapted, flags=re.IGNORECASE)
+	adapted = _adapt_mysql_create_table(adapted)
+	adapted = _adapt_mysql_alter_table(adapted)
+	return adapted.replace("?", "%s")
+
+def _mysql_result_value(value):
+	if isinstance(value, datetime):
+		return value.strftime("%Y-%m-%d %H:%M:%S")
+	if isinstance(value, date):
+		return value.strftime("%Y-%m-%d")
+	return value
+
+def _mysql_result_row(row):
+	if row is None:
+		return None
+	return {key: _mysql_result_value(value) for key, value in row.items()}
+
+class MySQLCursorAdapter:
+	def __init__(self, cursor):
+		self._cursor = cursor
+		self.lastrowid = cursor.lastrowid
+		self.rowcount = cursor.rowcount
+
+	def fetchone(self):
+		return _mysql_result_row(self._cursor.fetchone())
+
+	def fetchall(self):
+		return [_mysql_result_row(row) for row in self._cursor.fetchall()]
+
+class MySQLConnectionAdapter:
+	def __init__(self, raw_connection, pymysql):
+		self._connection = raw_connection
+		self._pymysql = pymysql
+
+	def execute(self, sql, params=None):
+		try:
+			cursor = self._connection.cursor()
+			cursor.execute(_adapt_mysql_sql(sql), tuple(params or ()))
+			return MySQLCursorAdapter(cursor)
+		except self._pymysql.err.IntegrityError as exc:
+			raise sqlite3.IntegrityError(str(exc)) from exc
+		except (self._pymysql.err.OperationalError, self._pymysql.err.ProgrammingError) as exc:
+			raise sqlite3.OperationalError(str(exc)) from exc
+
+	def commit(self):
+		self._connection.commit()
+
+	def rollback(self):
+		self._connection.rollback()
+
+	def close(self):
+		self._connection.close()
+
+	def __enter__(self):
+		return self
+
+	def __exit__(self, exc_type, exc_value, traceback):
+		if exc_type:
+			self.rollback()
+		else:
+			self.commit()
+		self.close()
+		return False
+
+def test_database_connection(config=None):
+	try:
+		test_config = config or get_database_config()
+		if _normalize_db_type(test_config.get("type")) == "mysql":
+			conn = _connect_mysql(test_config)
+			conn.close()
+		else:
+			sqlite_path = test_config.get("sqlite_path") or DEFAULT_SQLITE_PATH
+			if not os.path.isabs(sqlite_path):
+				sqlite_path = os.path.join(_project_root(), sqlite_path)
+			os.makedirs(os.path.dirname(sqlite_path), exist_ok=True)
+			conn = sqlite3.connect(sqlite_path)
+			conn.close()
+		return True, "数据库连接成功"
+	except Exception as exc:
+		return False, str(exc)
+
+def get_connection(sqlite_path=None):
+	config = get_database_config()
+	if config["type"] == "mysql":
+		return MySQLConnectionAdapter(_connect_mysql(config), _get_mysql_module())
+	db_path = sqlite_path or config.get("sqlite_path") or DEFAULT_SQLITE_PATH
+	if not os.path.isabs(db_path):
+		db_path = os.path.join(_project_root(), db_path)
+	os.makedirs(os.path.dirname(db_path), exist_ok=True)
+	conn = sqlite3.connect(db_path)
 	conn.row_factory = sqlite3.Row
 	return conn
 

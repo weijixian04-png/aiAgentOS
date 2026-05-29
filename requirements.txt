@@ -4,3 +4,4 @@ requests
 apscheduler
 croniter
 beautifulsoup4
+PyMySQL

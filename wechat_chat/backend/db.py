@@ -1,5 +1,5 @@
 import os
-import sqlite3
+from app.models.db import get_connection as get_shared_connection
 
 def get_db_path():
     """获取子系统独立数据库路径"""
@@ -11,9 +11,7 @@ def get_db_path():
 
 def get_connection():
     """获取数据库连接"""
-    conn = sqlite3.connect(get_db_path())
-    conn.row_factory = sqlite3.Row
-    return conn
+    return get_shared_connection(sqlite_path=get_db_path())
 
 def init_db():
     """初始化子系统数据库表"""

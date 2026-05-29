@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据库配置 - cnAgentOS管理系统</title>
+    <link rel="stylesheet" href="/static/dist/layui-v2.13.6/layui/css/layui.css">
+    <style>
+        body { margin: 0; padding: 0; background: #f5f5f5; }
+        .layui-layout-admin .layui-header { background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); box-shadow: 0 2px 10px rgba(0,0,0,0.15); }
+        .layui-header .layui-logo { color: white; font-size: 18px; font-weight: 600; padding: 0 30px; }
+        .layui-nav-item a { color: white !important; }
+        .layui-nav-item:hover { background: rgba(255,255,255,0.1); }
+        .layui-side { background: #2f4050; width: 200px; }
+        .layui-side-scroll { width: 220px; }
+        .layui-nav-tree .layui-nav-item a { color: #a7b1c2; height: 45px; line-height: 45px; padding-left: 25px; }
+        .layui-nav-tree .layui-nav-item a:hover { color: white; background: #293846; }
+        .layui-nav-tree .layui-nav-item.layui-nav-itemed>a { background: #1ab394 !important; color: white; }
+        .layui-body { background: #f3f3f4; left: 200px; padding: 20px; }
+        .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: rgba(255,255,255,0.2); display: inline-block; line-height: 32px; text-align: center; margin-right: 8px; font-size: 14px; }
+        .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .page-title { font-size: 20px; font-weight: 600; color: #676a6c; }
+        .config-card { background: white; border-radius: 8px; padding: 24px; box-shadow: 0 2px 12px 0 rgba(0,0,0,0.08); }
+        .status-box { display: flex; gap: 16px; margin-bottom: 24px; }
+        .status-item { flex: 1; border: 1px solid #eee; border-radius: 8px; padding: 16px; background: #fafafa; }
+        .status-label { color: #999; margin-bottom: 8px; }
+        .status-value { color: #1e3c72; font-weight: 600; word-break: break-all; }
+        .form-section { margin-top: 16px; }
+        .section-title { font-size: 16px; color: #676a6c; font-weight: 600; margin: 20px 0 16px; }
+        .tips { padding: 12px 16px; border-radius: 6px; background: #f0f7ff; color: #2a5298; margin-bottom: 20px; }
+    </style>
+</head>
+<body class="layui-layout-body">
+    <div class="layui-layout layui-layout-admin">
+        <div class="layui-header">
+            <div class="layui-logo"><i class="layui-icon layui-icon-laptop"></i> cnAgentOS 管理系统</div>
+            <ul class="layui-nav layui-layout-right">
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="refreshBtn"><i class="layui-icon layui-icon-refresh"></i> 刷新</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="fullscreenBtn"><i class="layui-icon layui-icon-screen-full"></i> 全屏</a></li>
+                <li class="layui-nav-item"><a href="javascript:void(0)" id="userMenu"><span class="user-avatar">{{ current_user[:1].upper() }}</span> {{ current_user }}</a></li>
+                <li class="layui-nav-item"><a href="/auth/logout" id="logoutBtn"><i class="layui-icon layui-icon-power"></i> 退出</a></li>
+            </ul>
+        </div>
+        <div class="layui-side layui-bg-black">
+            <div class="layui-side-scroll">
+                <ul class="layui-nav layui-nav-tree" lay-filter="sideMenu">
+                    <li class="layui-nav-item layui-nav-itemed">
+                        <a href="javascript:void(0)"><i class="layui-icon layui-icon-dashboard"></i> 系统管理</a>
+                        <dl class="layui-nav-child">
+                            <dd><a href="/admin/users">用户管理</a></dd>
+                            <dd><a href="/admin/roles">角色管理</a></dd>
+                            <dd><a href="/admin/permissions">权限管理</a></dd>
+                            <dd class="layui-this"><a href="/admin/database">数据库配置</a></dd>
+                        </dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-set"></i> 功能管理</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/functions">功能列表</a></dd><dd><a href="/admin/modules">模块管理</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-server"></i> 模型引擎</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/models">模型管理</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-user"></i> 数字员工</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/employees">员工管理</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-search"></i> 瞭望管理</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/scout">瞭望源管理</a></dd><dd><a href="/admin/scout/collect">数据采集</a></dd><dd><a href="/admin/warehouse">数据仓库</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="javascript:void(0)"><i class="layui-icon layui-icon-link"></i> 接口管理</a>
+                        <dl class="layui-nav-child"><dd><a href="/admin/interfaces">接口列表</a></dd></dl>
+                    </li>
+                    <li class="layui-nav-item"><a href="/admin"><i class="layui-icon layui-icon-home"></i> 返回首页</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="layui-body">
+            <div class="page-header">
+                <h2 class="page-title">数据库配置</h2>
+            </div>
+            <div class="config-card">
+                <div class="status-box">
+                    <div class="status-item">
+                        <div class="status-label">当前数据库</div>
+                        <div class="status-value" id="currentType">{{ database_status["type"].upper() }}</div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-label">连接信息</div>
+                        <div class="status-value" id="currentDetail">{{ database_status["detail"] }}</div>
+                    </div>
+                </div>
+                <div class="tips">默认使用 SQLite；选择 MySQL 并保存后，系统会连接 MySQL、自动初始化主系统与智能聊天子系统数据表。</div>
+                <form class="layui-form" lay-filter="dbForm">
+                    <input type="hidden" id="xsrf_token" value="{{ xsrf_token }}">
+                    <div class="layui-form-item">
+                        <label class="layui-form-label">数据库类型</label>
+                        <div class="layui-input-block">
+                            <input type="radio" name="type" value="sqlite" title="SQLite" lay-filter="dbType" {% if database_config["type"] == "sqlite" %}checked{% end %}>
+                            <input type="radio" name="type" value="mysql" title="MySQL" lay-filter="dbType" {% if database_config["type"] == "mysql" %}checked{% end %}>
+                        </div>
+                    </div>
+                    <div id="sqliteFields" class="form-section">
+                        <div class="section-title">SQLite 配置</div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">数据库文件</label>
+                            <div class="layui-input-block">
+                                <input type="text" id="sqlitePath" value="{{ database_config["sqlite_path"] }}" class="layui-input">
+                            </div>
+                        </div>
+                    </div>
+                    <div id="mysqlFields" class="form-section">
+                        <div class="section-title">MySQL 配置</div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">主机</label>
+                            <div class="layui-input-block"><input type="text" id="mysqlHost" value="{{ database_config["mysql"]["host"] }}" class="layui-input"></div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">端口</label>
+                            <div class="layui-input-block"><input type="number" id="mysqlPort" value="{{ database_config["mysql"]["port"] }}" class="layui-input"></div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">用户名</label>
+                            <div class="layui-input-block"><input type="text" id="mysqlUser" value="{{ database_config["mysql"]["user"] }}" class="layui-input"></div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">密码</label>
+                            <div class="layui-input-block"><input type="password" id="mysqlPassword" placeholder="{% if database_config["mysql"]["password_set"] %}已设置密码，留空表示不修改{% else %}请输入MySQL密码，可为空{% end %}" class="layui-input"></div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">数据库名</label>
+                            <div class="layui-input-block"><input type="text" id="mysqlDatabase" value="{{ database_config["mysql"]["database"] }}" class="layui-input"></div>
+                        </div>
+                        <div class="layui-form-item">
+                            <label class="layui-form-label">字符集</label>
+                            <div class="layui-input-block"><input type="text" id="mysqlCharset" value="{{ database_config["mysql"]["charset"] }}" class="layui-input"></div>
+                        </div>
+                    </div>
+                    <div class="layui-form-item">
+                        <div class="layui-input-block">
+                            <button type="button" id="saveBtn" class="layui-btn">测试并保存</button>
+                            <button type="button" id="reloadBtn" class="layui-btn layui-btn-primary">重新加载</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <script src="/static/dist/layui-v2.13.6/layui/layui.js"></script>
+    <script>
+        layui.use(["form", "layer"], function() {
+            var form = layui.form;
+            var layer = layui.layer;
+            var $ = layui.$;
+            function selectedType() {
+                return $("input[name='type']:checked").val();
+            }
+            function toggleFields() {
+                var type = selectedType();
+                $("#sqliteFields").toggle(type === "sqlite");
+                $("#mysqlFields").toggle(type === "mysql");
+            }
+            form.on("radio(dbType)", toggleFields);
+            toggleFields();
+            $("#saveBtn").on("click", function() {
+                var data = {
+                    _xsrf: $("#xsrf_token").val(),
+                    type: selectedType(),
+                    sqlite_path: $("#sqlitePath").val(),
+                    host: $("#mysqlHost").val(),
+                    port: $("#mysqlPort").val(),
+                    user: $("#mysqlUser").val(),
+                    password: $("#mysqlPassword").val(),
+                    database: $("#mysqlDatabase").val(),
+                    charset: $("#mysqlCharset").val()
+                };
+                var loading = layer.load(2, {shade: 0.2});
+                $.ajax({
+                    url: "/api/database/config",
+                    type: "post",
+                    data: data,
+                    success: function(res) {
+                        layer.close(loading);
+                        if (typeof res === "string") {
+                            res = JSON.parse(res);
+                        }
+                        if (res.code === 0) {
+                            layer.msg(res.msg, {icon: 1});
+                            $("#currentType").text(res.status.type.toUpperCase());
+                            $("#currentDetail").text(res.status.detail);
+                            $("#mysqlPassword").val("");
+                        } else {
+                            layer.msg(res.msg || "保存失败", {icon: 2});
+                        }
+                    },
+                    error: function(xhr) {
+                        layer.close(loading);
+                        layer.msg(xhr.responseText || "请求失败", {icon: 2});
+                    }
+                });
+            });
+            $("#reloadBtn").on("click", function() { window.location.reload(); });
+            $("#refreshBtn").on("click", function() { window.location.reload(); });
+            $("#fullscreenBtn").on("click", function() {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen();
+                    $(this).html('<i class="layui-icon layui-icon-screen-restore"></i> 退出全屏');
+                } else {
+                    document.exitFullscreen();
+                    $(this).html('<i class="layui-icon layui-icon-screen-full"></i> 全屏');
+                }
+            });
+            $("#logoutBtn").on("click", function(e) {
+                e.preventDefault();
+                layer.confirm("确定要退出登录吗？", function(index) {
+                    window.location.href = "/auth/logout";
+                    layer.close(index);
+                });
+            });
+        });
+    </script>
+</body>
+</html>
